@@ -1,14 +1,19 @@
-package com.example.tpgaresncf2
+package com.example.sncf_app_jaziri
 
-import androidx.appcompat.app.AppCompatActivity
+import android.content.Intent
 import android.os.Bundle
+import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.ListView
+import androidx.appcompat.app.AppCompatActivity
 import okhttp3.*
 import org.json.JSONObject
 import org.json.JSONTokener
 import java.io.IOException
+import android.os.Parcelable
+import com.example.tpgaresncf2.MapsActivity
+import com.example.tpgaresncf2.R
 
 
 class MainActivity : AppCompatActivity() {
@@ -17,9 +22,10 @@ class MainActivity : AppCompatActivity() {
     val cities = ArrayList<String>()
     val trains = ArrayList<String>()
     val client = OkHttpClient()
+    val token = "fd590875-e7cb-47ab-a4de-1e8749b075bf"
 
     //*******
-    //Mise en place des données et des fonctions selon les actions de l'utilisateur.
+    //OnCreate(): Mise en place des données et des fonctions selon les actions de l'utilisateur.
     //*******
 
     //Fonction onCreate(): équivalent du main.
@@ -45,12 +51,25 @@ class MainActivity : AppCompatActivity() {
         actvStation.setOnItemClickListener{
                 parent, _, position, _ ->
             val selectedItem = parent.getItemAtPosition(position)
+            adapterTrains.clear()
             stationsList.forEach{
-                    if (it.getLibelle() == selectedItem){    //Chercher la station ayant le nom sélectionné.
-                        getTrainsApi(it, adapterTrains)     //Rechercher les trains correspondant à la station.
-                    }
+                if (it.getLibelle() == selectedItem){    //Chercher la station ayant le nom sélectionné.
+                    getTrainsApi(it, adapterTrains)     //Rechercher les trains correspondant à la station.
                 }
             }
+        }
+
+        //Choix du train dans le ListView
+        //Lorsque l'utilisateur clique sur un train, ouvrir la vue MapsActivity et tracer le trajet de ce train.
+        //Faire une requête avec ce train. Il s'agit de récupérer
+        //url trajet: https://api.sncf.com/v1/coverage/sncf/journeys?from={FROM}&to={TO}&datetime={DATETIME}&walking_speed=normal&bike_speed=normal&car_speed=normal&departure_searched=true&arrival_searched=false&limit=10&apikey={APIKEY}
+        lvTrains.onItemClickListener = AdapterView.OnItemClickListener { parent, _, position, _ ->
+            val i = Intent(this, MapsActivity::class.java).apply{
+                val selectedTrain = parent.getItemAtPosition(position) as Train
+                putExtra("train", selectedTrain)
+            }
+            startActivity(i)
+        }
 
     }
 
@@ -79,8 +98,8 @@ class MainActivity : AppCompatActivity() {
     //Récupération des prochains départs pour la station sélectionnée dans l'AutoCompleteTextView.
     //*******
 
-    fun getTrainsApi(station: Station, adapter: ArrayAdapter<*>){
-        val url = "https://api.sncf.com/v1/coverage/sncf/stop_areas/stop_area:SNCF:${station.getUid().substring(2)}/departures/?count=8&key=fd590875-e7cb-47ab-a4de-1e8749b075bf"
+    fun getTrainsApi(station: Station?, adapter: ArrayAdapter<*>){
+        val url = "https://api.sncf.com/v1/coverage/sncf/stop_areas/stop_area:SNCF:${station!!.getUid().substring(2)}/departures/?count=8&key=${token}"
         val request = Request.Builder().url(url).build()
         println("Requête: $request")
         client.newCall(request).enqueue(object : Callback {
@@ -100,10 +119,10 @@ class MainActivity : AppCompatActivity() {
         })
     }
 
-    fun showTrains(reponse: JSONObject, station: Station){
+    fun showTrains(reponse: JSONObject, station: Station?){
         val trainList = ArrayList<Train>()
         val jsonDeparts = reponse.getJSONArray("departures")
-        var _trainToStation = station
+        var _trainFromStation = station
 
         //Pour chaque train, récupérer les données nécessaires pour créer un objet Train.
         for (i in 0 until jsonDeparts.length() ){
@@ -120,15 +139,10 @@ class MainActivity : AppCompatActivity() {
             }
 
             //Attribuer l'objet Station correspondant à la station de départ
-            var _trainFromStation: Station = station
+            var _trainToStationName: String = (_trainInformations.getString("direction"))
+            var _trainToStation: Station = Station("NULL", _trainToStationName, 0.0, 0.0)
             stationsList.forEach{
-                if (it.getLibelle().equals(_trainTrajet.getJSONObject("stop_point").getString("name"))){    //Chercher la station ayant le nom sélectionné.
-                    var _trainFromStation = it     //Rechercher les trains correspondant à la station.
-                }
-            }
-
-            stationsList.forEach{
-                if (it.getLibelle().equals(_trainTrajet.getJSONObject("route").getJSONObject("direction").getJSONObject("stop_area").getString("name"))) {    //Chercher la station ayant le nom sélectionné.
+                if (it.getLibelle().equals(_trainInformations.getString("direction")) /*_trainTrajet.getJSONObject("route").getJSONObject("direction").getJSONObject("stop_area").getString("name"))*/ ) {    //Chercher la station ayant le nom sélectionné.
                     _trainToStation = it     //Rechercher les trains correspondant à la station.
                 }
             }
@@ -141,8 +155,10 @@ class MainActivity : AppCompatActivity() {
             var _trainTo = Stop(_trainToStation, _trainFromHour, _trainFromMinute, _trainToHour, _trainToMinute)
 
             //Ajout du train à la liste.
-            trains.add(Train(_trainNum, _trainType, _trainFrom, _trainTo, _trainFromHour.toInt(), _trainFromMinute.toInt()).toString())
-            println("ajout du train $i en direction de ${_trainToStation.getLibelle()}" 
+            var _nouveauTrajet = Train(_trainNum, _trainType, _trainFromHour.toInt(), _trainFromMinute.toInt())
+            _nouveauTrajet.to = _trainTo
+            _nouveauTrajet.from = _trainFrom
+            trains.add(_nouveauTrajet.toString())
         }
     }
 

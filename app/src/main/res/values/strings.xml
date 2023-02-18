@@ -1,4 +1,6 @@
 <resources>
-    <string name="app_name">TPgaresncf2</string>
-    <string name="prochains_departs">Prochains départs:</string>
+    <string name="app_name">SNCF_info_app</string>
+    <string name="prochains_departs">Prochain départs:</string>
+    <string name="title_activity_maps">MapsActivity</string>
+    <string name="token">fd590875-e7cb-47ab-a4de-1e8749b075bf</string>
 </resources>

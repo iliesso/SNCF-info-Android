@@ -1,4 +1,4 @@
-package com.example.tpgaresncf2
+package com.example.sncf_app_jaziri
 
 enum class TypeTrain {
     TER,
